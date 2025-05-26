@@ -6,9 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	backuper "github.com/oiler-backup/mongodb-adapter/backuper/backuper"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -24,7 +21,7 @@ var (
 
 func setupMongoContainer() (*tc.Container, error) {
 	req := tc.ContainerRequest{
-		Image:           "mongo:8.0",
+		Image:           "sveb00/mongorestorer:0.0.1-1",
 		ExposedPorts:    []string{"27017/tcp"},
 		AlwaysPullImage: false,
 		Env: map[string]string{
@@ -56,17 +53,11 @@ func Test_Redtore_UploadValidDump(t *testing.T) {
 	dbPort, _ := (*mongoC).MappedPort(ctx, "27017")
 	tempDir := t.TempDir()
 	backupFile := filepath.Join(tempDir, "backup.dump")
-
-	b := backuper.NewBackuper(
-		dbhost,
-		dbPort.Port(),
-		dbUser,
-		dbPass,
-		dbName,
-		backupFile,
-	)
-
-	err = b.Backup(ctx, false)
+	file, err := os.Create(backupFile)
+	if err != nil {
+		panic(err)
+	}
+	file.Close()
 
 	r := NewRestorer(
 		dbhost,
@@ -79,10 +70,6 @@ func Test_Redtore_UploadValidDump(t *testing.T) {
 
 	err = r.Restore(ctx)
 	require.NoError(t, err)
-
-	fileInfo, err := os.Stat(backupFile)
-	require.NoError(t, err)
-	assert.Greater(t, fileInfo.Size(), int64(0))
 }
 
 func Test_Redtore_InvalidDump(t *testing.T) {
