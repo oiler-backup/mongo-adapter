@@ -1,0 +1,129 @@
+package restorer
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	backuper "github.com/oiler-backup/mongodb-adapter/backuper/backuper"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	tc "github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+var (
+	ctx        = context.Background()
+	dbUser     = "root"
+	dbPass     = "pass"
+	dbName     = "admin"
+	backupName = "backup.dump"
+)
+
+func setupMongoContainer() (*tc.Container, error) {
+	req := tc.ContainerRequest{
+		Image:           "mongo:8.0",
+		ExposedPorts:    []string{"27017/tcp"},
+		AlwaysPullImage: false,
+		Env: map[string]string{
+			"MONGO_INITDB_ROOT_USERNAME": dbUser,
+			"MONGO_INITDB_ROOT_PASSWORD": dbPass,
+		},
+		WaitingFor: wait.ForListeningPort("27017/tcp"),
+	}
+
+	mongoC, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+
+	return &mongoC, err
+}
+
+func Test_Redtore_UploadValidDump(t *testing.T) {
+	mongoC, err := setupMongoContainer()
+	require.NoError(t, err)
+	defer func() {
+		err := (*mongoC).Terminate(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	dbhost, _ := (*mongoC).ContainerIP(ctx)
+	dbPort, _ := (*mongoC).MappedPort(ctx, "27017")
+	tempDir := t.TempDir()
+	backupFile := filepath.Join(tempDir, "backup.dump")
+
+	b := backuper.NewBackuper(
+		dbhost,
+		dbPort.Port(),
+		dbUser,
+		dbPass,
+		dbName,
+		backupFile,
+	)
+
+	err = b.Backup(ctx, false)
+
+	r := NewRestorer(
+		dbhost,
+		dbPort.Port(),
+		dbUser,
+		dbPass,
+		dbName,
+		backupFile,
+	)
+
+	err = r.Restore(ctx)
+	require.NoError(t, err)
+
+	fileInfo, err := os.Stat(backupFile)
+	require.NoError(t, err)
+	assert.Greater(t, fileInfo.Size(), int64(0))
+}
+
+func Test_Redtore_InvalidDump(t *testing.T) {
+	mongoC, err := setupMongoContainer()
+	require.NoError(t, err)
+	defer func() {
+		err := (*mongoC).Terminate(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	dbhost, _ := (*mongoC).ContainerIP(ctx)
+	tempDir := t.TempDir()
+	backupFile := filepath.Join(tempDir, backupName)
+
+	r := NewRestorer(
+		dbhost,
+		"3306",
+		dbUser,
+		dbPass,
+		dbName,
+		backupFile,
+	)
+
+	err = r.Restore(ctx)
+	require.ErrorContains(t, err, "failed executing mysql restore:")
+}
+
+func Test_Redtore_InvalidDBHost(t *testing.T) {
+	dbhost := "wrong"
+	dbPort := "3306"
+	r := NewRestorer(
+		dbhost,
+		dbPort,
+		dbUser,
+		dbPass,
+		dbName,
+		backupName,
+	)
+
+	err := r.Restore(ctx)
+	require.ErrorContains(t, err, "failed to connect to database:")
+}
