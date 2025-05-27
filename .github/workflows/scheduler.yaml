@@ -24,6 +24,6 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         run: |
           SCHEDULER_VERSION=$(cat scheduler/VERSION)
-          docker build --no-cache --tag "$DOCKER_USERNAME"/postgres-scheduler:${SCHEDULER_VERSION} ./scheduler
-          docker tag "$DOCKER_USERNAME"/postgres-scheduler:${SCHEDULER_VERSION} "$DOCKER_USERNAME"/postgres-scheduler:latest
-          docker push --all-tags "$DOCKER_USERNAME"/postgres-scheduler
+          docker build --no-cache --tag "$DOCKER_USERNAME"/mongodb-scheduler:${SCHEDULER_VERSION} ./scheduler
+          docker tag "$DOCKER_USERNAME"/mongodb-scheduler:${SCHEDULER_VERSION} "$DOCKER_USERNAME"/mongodb-scheduler:latest
+          docker push --all-tags "$DOCKER_USERNAME"/mongodb-scheduler
