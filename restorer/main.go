@@ -54,6 +54,7 @@ func main() {
 	// Create a new MetricsReporter instance with the provided configuration.
 	metricsReporter = metricsbase.NewMetricsReporter(cfg.CoreAddr, false)
 
+	start := time.Now()
 	// Create a new S3Downloader instance with the provided configuration.
 	downloader, err := s3base.NewS3Downloader(ctx, cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, S3REGION, cfg.Secure)
 	if err != nil {
@@ -80,8 +81,9 @@ func main() {
 		mustProccessErrors("Failed to restore backup", err)
 	}
 
+	timeElapsed := time.Since(start)
 	// Report the successful restoration status.
-	err = metricsReporter.ReportRestoreStatus(ctx, backupInfo, true, time.Now().Unix())
+	err = metricsReporter.ReportRestoreStatus(ctx, backupInfo, true, int64(timeElapsed.Milliseconds()))
 	if err != nil {
 		mustProccessErrors("Failed to report successful status", err)
 	}
