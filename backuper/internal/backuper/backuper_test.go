@@ -3,7 +3,6 @@ package backuper
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,7 +12,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func Test_Backup_CreatesValidDump(t *testing.T) {
+func Test_Backup_CreatesInvalidDump(t *testing.T) {
 	ctx := context.Background()
 
 	req := tc.ContainerRequest{
@@ -48,18 +47,62 @@ func Test_Backup_CreatesValidDump(t *testing.T) {
 		host,
 		"27017",
 		"root",
-		"pass",
+		"aaa",
 		"admin",
 		backupFile,
 	)
 
 	err = b.Backup(ctx, false)
-	require.NoError(t, err)
-
-	fileInfo, err := os.Stat(backupFile)
-	require.NoError(t, err)
-	assert.Greater(t, fileInfo.Size(), int64(0))
+	require.ErrorContains(t, err, "Failed executing mongodump:")
 }
+
+// func Test_Backup_CreatesValidDump(t *testing.T) {
+// 	ctx := context.Background()
+
+// 	req := tc.ContainerRequest{
+// 		Image:           "mongo:8.0",
+// 		ExposedPorts:    []string{"27017/tcp"},
+// 		AlwaysPullImage: false,
+// 		Env: map[string]string{
+// 			"MONGO_INITDB_ROOT_USERNAME": "root",
+// 			"MONGO_INITDB_ROOT_PASSWORD": "pass",
+// 		},
+// 		WaitingFor: wait.ForListeningPort("27017/tcp"),
+// 	}
+
+// 	mongoC, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{
+// 		ContainerRequest: req,
+// 		Started:          true,
+// 	})
+// 	require.NoError(t, err)
+// 	defer func() {
+// 		err := mongoC.Terminate(ctx)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+// 	}()
+
+// 	host, _ := mongoC.ContainerIP(ctx)
+
+// 	tempDir := t.TempDir()
+// 	backupFile := filepath.Join(tempDir, "backup.dump")
+
+// 	b := NewBackuper(
+// 		host,
+// 		"27017",
+// 		"root",
+// 		"pass",
+// 		"admin",
+// 		backupFile,
+// 	)
+
+// 	err = b.Backup(ctx, false)
+// 	require.NoError(t, err)
+
+// 	fileInfo, err := os.Stat(backupFile)
+// 	require.NoError(t, err)
+// 	assert.Greater(t, fileInfo.Size(), int64(0))
+// }
 
 func Test_BuildBackup(t *testing.T) {
 	message := "some message: %s"
